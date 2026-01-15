@@ -25,6 +25,8 @@ const categoryKeywords = {
 // Expense Input Handling
 // ==========================================
 
+
+
 // Get DOM elements
 const amountInput = document.getElementById('amount');
 const descriptionInput = document.getElementById('description');
@@ -32,16 +34,125 @@ const addExpenseBtn = document.getElementById('add-expense-btn');
 const errorMessage = document.getElementById('error-message');
 const expenseContainer = document.getElementById('expense-container');
 const totalSpentElement = document.getElementById('total-spent');
+const emergencyFundStatusElement = document.querySelectorAll('.card .status')[0]; // Emergency Fund
+const financialHealthElement = document.querySelectorAll('.card .status')[1]; // Financial Health
+const insightsContainer = document.querySelector('.insight-container');
 
-// Debug: Check if elements are found
-console.log('DOM Elements loaded:', {
-    amountInput,
-    descriptionInput,
-    addExpenseBtn,
-    errorMessage,
-    expenseContainer,
-    totalSpentElement
-});
+// Allowance and allocation model
+let monthlyAllowance = 10000; // fixed for now
+let allocationPercentages = {
+    emergency: 15,
+    investment: 10,
+    food: 25,
+    transport: 10,
+    education: 15,
+    entertainment: 10,
+    buffer: 5
+};
+
+// Helper: Calculate totals and percentages for each category
+function calculateCategoryTotals(expenses, allowance) {
+    let totals = {
+        emergency: 0,
+        investment: 0,
+        food: 0,
+        transport: 0,
+        education: 0,
+        entertainment: 0,
+        buffer: 0,
+        essentials: 0,
+        discretionary: 0,
+        total: 0
+    };
+    // Loop through expenses and sum by category
+    for (let i = 0; i < expenses.length; i++) {
+        let cat = expenses[i].category;
+        let amt = expenses[i].amount;
+        totals.total += amt;
+        if (cat === 'Food') { totals.food += amt; totals.essentials += amt; }
+        else if (cat === 'Transport') { totals.transport += amt; totals.essentials += amt; }
+        else if (cat === 'Education') { totals.education += amt; totals.essentials += amt; }
+        else if (cat === 'Entertainment') { totals.entertainment += amt; totals.discretionary += amt; }
+        else if (cat === 'Investment') { totals.investment += amt; totals.discretionary += amt; }
+        else if (cat === 'Emergency') { totals.emergency += amt; }
+        else { totals.buffer += amt; totals.discretionary += amt; }
+    }
+    // Calculate percentages
+    let percents = {};
+    for (let key in totals) {
+        if (key !== 'total' && allowance > 0) {
+            percents[key] = (totals[key] / allowance) * 100;
+        }
+    }
+    return { totals, percents };
+}
+
+// Helper: Emergency fund calculation
+function calculateEmergencyFund(allowance, allocationPercentages) {
+    let min = Math.round(allowance * 0.10);
+    let recommended = Math.round(allowance * (allocationPercentages.emergency / 100));
+    let target = recommended; // For now, user cannot set custom
+    return {
+        min: min,
+        recommended: recommended,
+        target: target
+    };
+}
+
+// Helper: Evaluate financial health
+function evaluateFinancialHealth(categoryPercents, emergencyData, investmentAllowed, totalSpent) {
+    // Priority: Risky > Needs Attention > Stable > On Track
+    // Risky if: emergency fund allocation is 0, entertainment > 20%, or total spent >= allowance
+    if (categoryPercents.emergency === undefined || categoryPercents.emergency === 0) {
+        return 'Risky';
+    }
+    if (categoryPercents.entertainment !== undefined && categoryPercents.entertainment > 20) {
+        return 'Risky';
+    }
+    if (totalSpent >= monthlyAllowance) {
+        return 'Risky';
+    }
+    // Needs Attention if: emergency < 10%, entertainment > 15%, or investment enabled but emergency < min
+    if (categoryPercents.emergency !== undefined && categoryPercents.emergency < 10) {
+        return 'Needs Attention';
+    }
+    if (categoryPercents.entertainment !== undefined && categoryPercents.entertainment > 15) {
+        return 'Needs Attention';
+    }
+    if (!investmentAllowed) {
+        return 'Needs Attention';
+    }
+    // Stable if: emergency >= min, entertainment <= 15%
+    if (categoryPercents.emergency !== undefined && categoryPercents.emergency >= 10 && categoryPercents.entertainment !== undefined && categoryPercents.entertainment <= 15) {
+        return 'Stable';
+    }
+    // On Track if: emergency >= recommended, entertainment <= 10%, essentials <= 65%
+    if (categoryPercents.emergency !== undefined && categoryPercents.emergency >= emergencyData.recommended / monthlyAllowance * 100 && categoryPercents.entertainment !== undefined && categoryPercents.entertainment <= 10 && categoryPercents.essentials !== undefined && categoryPercents.essentials <= 65) {
+        return 'On Track';
+    }
+    return 'Stable'; // Default
+}
+
+// Helper: Generate insights
+function generateInsights(categoryPercents, emergencyData, investmentAllowed) {
+    let insights = [];
+    if (categoryPercents.entertainment !== undefined && categoryPercents.entertainment > 20) {
+        insights.push('Entertainment spending is above 20% of your allowance. Try to limit it.');
+    }
+    if (categoryPercents.food !== undefined && categoryPercents.food > 30) {
+        insights.push('Food expenses are a large part of your budget.');
+    }
+    if (categoryPercents.essentials !== undefined && categoryPercents.essentials > 65) {
+        insights.push('Essentials are taking up most of your spending.');
+    }
+    if (!investmentAllowed) {
+        insights.push('Investments are not allowed until your emergency fund minimum is met.');
+    }
+    if (insights.length === 0) {
+        insights.push('Your spending is balanced. Keep it up!');
+    }
+    return insights;
+}
 
 // Add expense when button is clicked
 addExpenseBtn.addEventListener('click', function() {
@@ -88,7 +199,7 @@ addExpenseBtn.addEventListener('click', function() {
     
     // Update the UI
     renderExpenses();
-    updateTotalSpent();
+    updateDashboard();
 });
 
 // ==========================================
@@ -191,6 +302,7 @@ function renderExpenses() {
         const expenseCategory = document.createElement('div');
         expenseCategory.classList.add('expense-category');
         expenseCategory.textContent = expense.category;
+        expenseCategory.style.color = '#888'; // Subtle style
         
         // Append to info section
         expenseInfo.appendChild(expenseDescription);
@@ -211,43 +323,207 @@ function renderExpenses() {
 }
 
 // ==========================================
+// Emergency Fund Calculation & Update
+// ==========================================
+
+function updateEmergencyFund() {
+    // Essential categories
+    const essentialCategories = ['Food', 'Transport', 'Education'];
+    let essentialTotal = 0;
+    let essentialCount = 0;
+
+    // Calculate total and count for essential expenses
+    for (let i = 0; i < expenses.length; i++) {
+        if (essentialCategories.indexOf(expenses[i].category) !== -1) {
+            essentialTotal += expenses[i].amount;
+            essentialCount++;
+        }
+    }
+
+    // Calculate average essential spending
+    let avgEssential = essentialCount > 0 ? (essentialTotal / essentialCount) : 0;
+    // Emergency fund target = 3 × average essential spending
+    let emergencyTarget = avgEssential * 3;
+
+    // Status logic
+    let status = 'Not set';
+    if (essentialTotal === 0) {
+        status = 'Not set';
+    } else if (essentialTotal < emergencyTarget) {
+        status = 'In progress';
+    } else {
+        status = 'On track';
+    }
+
+    // Update DOM
+    if (emergencyFundStatusElement) {
+        emergencyFundStatusElement.textContent = status + (emergencyTarget > 0 ? ` (Target: ₹${emergencyTarget.toFixed(2)})` : '');
+    }
+}
+
+// ==========================================
+// Financial Health Indicator
+// ==========================================
+
+function updateFinancialHealth() {
+    let totalEssential = 0;
+    let totalDiscretionary = 0;
+    let totalEntertainment = 0;
+    let totalSpent = 0;
+
+    // Categorize spending
+    for (let i = 0; i < expenses.length; i++) {
+        const exp = expenses[i];
+        totalSpent += exp.amount;
+        if (exp.category === 'Food' || exp.category === 'Transport' || exp.category === 'Education') {
+            totalEssential += exp.amount;
+        } else if (exp.category === 'Entertainment') {
+            totalEntertainment += exp.amount;
+            totalDiscretionary += exp.amount;
+        } else {
+            totalDiscretionary += exp.amount;
+        }
+    }
+
+    let health = 'Getting Started';
+    if (expenses.length === 0) {
+        health = 'Getting Started';
+    } else if (totalEssential >= totalDiscretionary) {
+        health = 'Stable';
+    } else if (totalEntertainment > 0 && totalEntertainment > totalEssential) {
+        health = 'Needs Attention';
+    } else if (totalSpent > 10000) { // Example threshold
+        health = 'Risky';
+    }
+
+    // Update DOM
+    if (financialHealthElement) {
+        financialHealthElement.textContent = health;
+    }
+}
+
+// ==========================================
+// Insights & Alerts
+// ==========================================
+
+function updateInsights() {
+    let insights = [];
+    let totalSpent = 0;
+    let entertainmentSpent = 0;
+    let foodSpent = 0;
+    let essentialSpent = 0;
+    let essentialCount = 0;
+
+    for (let i = 0; i < expenses.length; i++) {
+        totalSpent += expenses[i].amount;
+        if (expenses[i].category === 'Entertainment') entertainmentSpent += expenses[i].amount;
+        if (expenses[i].category === 'Food') foodSpent += expenses[i].amount;
+        if (expenses[i].category === 'Food' || expenses[i].category === 'Transport' || expenses[i].category === 'Education') {
+            essentialSpent += expenses[i].amount;
+            essentialCount++;
+        }
+    }
+
+    // Rule-based insights
+    if (expenses.length === 0) {
+        insights.push('Start adding your expenses to get insights!');
+    } else {
+        if (entertainmentSpent > 0.3 * totalSpent) {
+            insights.push('High entertainment spending. Consider reducing for better savings.');
+        }
+        if (foodSpent > 0.4 * totalSpent) {
+            insights.push('Food expenses are a major part of your spending.');
+        }
+        if (essentialSpent > 0 && essentialSpent / totalSpent > 0.7) {
+            insights.push('Most of your spending is on essentials. Good job prioritizing needs!');
+        }
+        if (totalSpent > 10000) {
+            insights.push('Total spending is high. Review your expenses for possible savings.');
+        }
+        if (insights.length === 0) {
+            insights.push('Your spending is balanced. Keep it up!');
+        }
+    }
+
+    // Update DOM
+    if (insightsContainer) {
+        insightsContainer.innerHTML = '';
+        for (let i = 0; i < insights.length && i < 2; i++) {
+            const p = document.createElement('p');
+            p.textContent = insights[i];
+            p.className = 'insight-placeholder';
+            insightsContainer.appendChild(p);
+        }
+    }
+}
+
+// ==========================================
 // Update Dashboard
 // ==========================================
 
 function updateTotalSpent() {
     // Calculate total
     let total = 0;
-    
     for (let i = 0; i < expenses.length; i++) {
         total = total + expenses[i].amount;
     }
-    
     // Update the total spent element
     totalSpentElement.textContent = '₹' + total.toFixed(2);
+    return total;
 }
 
+
 // ==========================================
-// Future Features (Placeholders)
+// Dashboard Update (Main)
 // ==========================================
 
-// TODO: auto categorize expense
-// - Analyze description text
-// - Assign category based on keywords
-// - Update expense with category
+function updateDashboard() {
+    // Calculate totals and percents
+    let { totals, percents } = calculateCategoryTotals(expenses, monthlyAllowance);
+    let emergencyData = calculateEmergencyFund(monthlyAllowance, allocationPercentages);
 
-// TODO: calculate emergency fund status
-// - Determine savings goal
-// - Calculate percentage saved
-// - Update emergency fund card
+    // Emergency fund allocation (actual spent in 'Emergency' category)
+    let emergencySpent = totals.emergency;
+    let emergencyStatus = 'Not Set';
+    if (emergencySpent === 0) {
+        emergencyStatus = 'Not Set';
+    } else if (emergencySpent < emergencyData.min) {
+        emergencyStatus = 'In Progress';
+    } else if (emergencySpent >= emergencyData.recommended) {
+        emergencyStatus = 'On Track';
+    } else {
+        emergencyStatus = 'In Progress';
+    }
+    if (emergencyFundStatusElement) {
+        emergencyFundStatusElement.textContent = emergencyStatus + ` (Min: ₹${emergencyData.min}, Rec: ₹${emergencyData.recommended})`;
+    }
 
-// TODO: calculate financial health
-// - Analyze spending patterns
-// - Generate health score
-// - Update health indicator
+    // Investment allowed only if emergency fund >= min
+    let investmentAllowed = (emergencySpent >= emergencyData.min);
 
-// TODO: generate insights
-// - Analyze spending trends
-// - Identify unusual expenses
-// - Create alerts and recommendations
+    // Financial health
+    let health = evaluateFinancialHealth(percents, emergencyData, investmentAllowed, totals.total);
+    if (financialHealthElement) {
+        financialHealthElement.textContent = health;
+    }
+
+    // Insights
+    let insights = generateInsights(percents, emergencyData, investmentAllowed);
+    if (insightsContainer) {
+        insightsContainer.innerHTML = '';
+        for (let i = 0; i < insights.length && i < 2; i++) {
+            const p = document.createElement('p');
+            p.textContent = insights[i];
+            p.className = 'insight-placeholder';
+            insightsContainer.appendChild(p);
+        }
+    }
+
+    // Update total spent
+    updateTotalSpent();
+}
+
+// Initial dashboard update
+updateDashboard();
 
 }); // End of DOMContentLoaded
