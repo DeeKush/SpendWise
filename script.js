@@ -1,11 +1,25 @@
 // SpendWise - Dashboard JavaScript
 
+// Wait for DOM to fully load before running code
+document.addEventListener('DOMContentLoaded', function() {
+
 // ==========================================
 // Data Storage
 // ==========================================
 
 // Array to store all expenses
 let expenses = [];
+
+// Category keyword mapping
+const categoryKeywords = {
+    'Food': ['food', 'dinner', 'lunch', 'breakfast', 'canteen', 'pizza', 'burger', 'restaurant', 'cafe', 'snack', 'coffee', 'tea'],
+    'Transport': ['bus', 'auto', 'uber', 'ola', 'cab', 'metro', 'taxi', 'petrol', 'fuel', 'parking', 'toll'],
+    'Entertainment': ['movie', 'netflix', 'game', 'concert', 'spotify', 'amazon prime', 'youtube', 'theatre', 'show'],
+    'Education': ['book', 'course', 'fees', 'class', 'tuition', 'notebook', 'pen', 'pencil', 'study'],
+    'Shopping': ['clothes', 'shirt', 'shoes', 'shopping', 'mall', 'amazon', 'flipkart', 'online'],
+    'Health': ['medicine', 'doctor', 'hospital', 'pharmacy', 'gym', 'clinic', 'medical'],
+    'Bills': ['electricity', 'water', 'rent', 'internet', 'phone', 'recharge', 'wifi']
+};
 
 // ==========================================
 // Expense Input Handling
@@ -19,25 +33,51 @@ const errorMessage = document.getElementById('error-message');
 const expenseContainer = document.getElementById('expense-container');
 const totalSpentElement = document.getElementById('total-spent');
 
+// Debug: Check if elements are found
+console.log('DOM Elements loaded:', {
+    amountInput,
+    descriptionInput,
+    addExpenseBtn,
+    errorMessage,
+    expenseContainer,
+    totalSpentElement
+});
+
 // Add expense when button is clicked
 addExpenseBtn.addEventListener('click', function() {
+    console.log('Button clicked!'); // Debug log
+    
     // Get input values
     const amount = amountInput.value;
     const description = descriptionInput.value;
     
+    console.log('Input values:', { amount, description }); // Debug log
+    
     // Validate inputs
     if (!validateInputs(amount, description)) {
+        console.log('Validation failed'); // Debug log
         return; // Stop if validation fails
     }
+    
+    console.log('Validation passed'); // Debug log
+    
+    // Categorize the expense based on description
+    const category = categorizeExpense(description);
+    
+    console.log('Category:', category); // Debug log
     
     // Create expense object
     const expense = {
         amount: parseFloat(amount),
-        description: description
+        description: description,
+        category: category
     };
     
     // Add expense to array
     expenses.push(expense);
+    
+    console.log('Expense added. Total expenses:', expenses.length); // Debug log
+    console.log('All expenses:', expenses); // Debug log
     
     // Clear inputs
     amountInput.value = '';
@@ -90,6 +130,33 @@ function hideError() {
 }
 
 // ==========================================
+// Expense Categorization
+// ==========================================
+
+function categorizeExpense(description) {
+    // Convert description to lowercase for matching
+    const lowercaseDescription = description.toLowerCase();
+    
+    // Loop through each category
+    for (let category in categoryKeywords) {
+        const keywords = categoryKeywords[category];
+        
+        // Check each keyword in the category
+        for (let i = 0; i < keywords.length; i++) {
+            const keyword = keywords[i];
+            
+            // Check if description contains the keyword
+            if (lowercaseDescription.includes(keyword)) {
+                return category; // Return first match found
+            }
+        }
+    }
+    
+    // If no match found, return "Other"
+    return 'Other';
+}
+
+// ==========================================
 // Render Expense List
 // ==========================================
 
@@ -123,7 +190,7 @@ function renderExpenses() {
         // Add category placeholder
         const expenseCategory = document.createElement('div');
         expenseCategory.classList.add('expense-category');
-        expenseCategory.textContent = 'Uncategorized';
+        expenseCategory.textContent = expense.category;
         
         // Append to info section
         expenseInfo.appendChild(expenseDescription);
@@ -183,3 +250,4 @@ function updateTotalSpent() {
 // - Identify unusual expenses
 // - Create alerts and recommendations
 
+}); // End of DOMContentLoaded
