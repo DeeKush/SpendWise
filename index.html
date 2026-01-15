@@ -18,7 +18,7 @@
         <section class="summary-cards">
             <div class="card">
                 <h3>Total Spent</h3>
-                <p class="amount">₹0</p>
+                <p class="amount" id="total-spent">₹0</p>
             </div>
             <div class="card">
                 <h3>Emergency Fund Status</h3>
@@ -42,6 +42,7 @@
                     <label for="description">Where did you spend?</label>
                     <input type="text" id="description" placeholder="E.g., Groceries, Transport, Dinner">
                 </div>
+                <div id="error-message" class="error-message"></div>
                 <button id="add-expense-btn" class="btn-primary">Add Expense</button>
             </div>
         </section>

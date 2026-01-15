@@ -120,6 +120,20 @@ body {
     border-color: #3498db;
 }
 
+/* Error Message */
+.error-message {
+    color: #e74c3c;
+    font-size: 0.9rem;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: #fadbd8;
+    display: none;
+}
+
+.error-message.show {
+    display: block;
+}
+
 /* Buttons */
 .btn-primary {
     background-color: #3498db;
