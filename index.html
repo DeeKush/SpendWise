@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpendWise - Expense Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>SpendWise</h1>
+            <p class="subtitle">Build better financial habits</p>
+        </header>
+
+        <!-- Summary Cards -->
+        <section class="summary-cards">
+            <div class="card">
+                <h3>Total Spent</h3>
+                <p class="amount">₹0</p>
+            </div>
+            <div class="card">
+                <h3>Emergency Fund Status</h3>
+                <p class="status">Not Set</p>
+            </div>
+            <div class="card">
+                <h3>Financial Health</h3>
+                <p class="status">Getting Started</p>
+            </div>
+        </section>
+
+        <!-- Expense Input Section -->
+        <section class="expense-input">
+            <h2>Add New Expense</h2>
+            <div class="input-form">
+                <div class="form-group">
+                    <label for="amount">Amount</label>
+                    <input type="number" id="amount" placeholder="Enter amount" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="description">Where did you spend?</label>
+                    <input type="text" id="description" placeholder="E.g., Groceries, Transport, Dinner">
+                </div>
+                <button id="add-expense-btn" class="btn-primary">Add Expense</button>
+            </div>
+        </section>
+
+        <!-- Expense List Section -->
+        <section class="expense-list">
+            <h2>Your Expenses</h2>
+            <div id="expense-container">
+                <!-- Expense entries will be added here -->
+                <p class="empty-state">No expenses yet. Start tracking your spending!</p>
+            </div>
+        </section>
+
+        <!-- Insights / Alerts Section -->
+        <section class="insights">
+            <h2>Insights & Alerts</h2>
+            <div class="insight-container">
+                <p class="insight-placeholder">Your financial insights will appear here as you track expenses.</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
